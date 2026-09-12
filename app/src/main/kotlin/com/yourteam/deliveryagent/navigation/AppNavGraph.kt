@@ -103,7 +103,7 @@ fun AppNavGraph(
             }
 
             composable(NavRoutes.PROFILE) {
-                ProfileScreen(
+                com.yourteam.deliveryagent.ui.screens.profile.ProfileScreenWrapper(
                     onLogout = {
                         navController.navigate(NavRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }

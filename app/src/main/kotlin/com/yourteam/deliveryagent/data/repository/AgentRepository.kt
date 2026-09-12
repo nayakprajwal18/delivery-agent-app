@@ -83,6 +83,42 @@ class AgentRepository(private val supabase: SupabaseClient) {
             .decodeList<DeliveredOrderSummary>()
         rows.sumOf { it.deliveryFee }
     }
+
+    // ── Updates ──────────────────────────────────────────────────────────────
+
+    /**
+     * Update a profile row (e.g., full_name).
+     */
+    suspend fun updateProfile(
+        userId: String,
+        fullName: String,
+    ): Result<Unit> = runCatching {
+        supabase.postgrest["profiles"]
+            .update(mapOf("full_name" to fullName)) {
+                filter { eq("id", userId) }
+            }
+    }
+
+    /**
+     * Update a delivery_agent row (vehicle info and availability).
+     */
+    suspend fun updateAgent(
+        agentId: String,
+        vehicleType: String,
+        vehicleNumber: String,
+        isOnline: Boolean,
+    ): Result<Unit> = runCatching {
+        supabase.postgrest["delivery_agents"]
+            .update(
+                mapOf(
+                    "vehicle_type" to vehicleType,
+                    "vehicle_number" to vehicleNumber,
+                    "is_online" to isOnline,
+                )
+            ) {
+                filter { eq("id", agentId) }
+            }
+    }
 }
 
 /** Minimal projection used for earnings aggregation. */

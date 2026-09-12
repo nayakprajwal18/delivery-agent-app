@@ -8,114 +8,284 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.yourteam.deliveryagent.ui.theme.DeliveryAgentTheme
+import com.yourteam.deliveryagent.ui.screens.profile.ProfileUiState
+import kotlinx.coroutines.launch
 
 /**
- * Agent profile: name, phone, vehicle info, availability toggle, total earnings, logout.
- * TODO (Phase 5): wire to ProfileViewModel.
+ * Shows the agent's profile information with editable fields.
+ * Displays: name, phone, vehicle type/number, availability, stats.
+ * Allows saving changes and logging out.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    uiState: ProfileUiState = ProfileUiState.Loading,
+    onFullNameChange: (String) -> Unit = {},
+    onVehicleTypeChange: (String) -> Unit = {},
+    onVehicleNumberChange: (String) -> Unit = {},
+    onAvailabilityChange: (Boolean) -> Unit = {},
+    onSave: () -> Unit = {},
     onLogout: () -> Unit = {},
+    onRetry: () -> Unit = {},
 ) {
-    var isOnline by rememberSaveable { mutableStateOf(true) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color    = MaterialTheme.colorScheme.background,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-        ) {
-            Text("Profile", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(20.dp))
-
-            ProfileField(label = "Name",          value = "—")
-            ProfileField(label = "Phone",         value = "—")
-            ProfileField(label = "Vehicle type",  value = "—")
-            ProfileField(label = "Vehicle number", value = "—")
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            // ── Availability toggle ────────────────────────────────────────
-            Row(
-                modifier          = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("Availability", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text  = if (isOnline) "Online — accepting deliveries" else "Offline",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isOnline) MaterialTheme.colorScheme.primary
-                                else         MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Agent Profile") },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        when (uiState) {
+            is ProfileUiState.Loading -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text("Loading profile...")
                 }
-                Switch(
-                    checked         = isOnline,
-                    onCheckedChange = {
-                        isOnline = it
-                        // TODO: ProfileViewModel.toggleOnline(it)
-                    },
-                )
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+            is ProfileUiState.Success -> {
+                // Show error snackbar if present
+                LaunchedEffect(uiState.saveError) {
+                    uiState.saveError?.let {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(it)
+                        }
+                    }
+                }
 
-            // ── Total earnings ─────────────────────────────────────────────
-            ProfileField(label = "Total earnings (all time)", value = "₹—")
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    // ── Read-only fields ────────────────────────────────────
+                    ReadOnlyField(
+                        label = "Phone",
+                        value = uiState.phone,
+                    )
 
-            Spacer(Modifier.weight(1f))
+                    // ── Editable fields ────────────────────────────────────
+                    OutlinedTextField(
+                        value = uiState.fullName,
+                        onValueChange = onFullNameChange,
+                        label = { Text("Full Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isSaving,
+                        singleLine = true,
+                    )
 
-            // ── Logout ─────────────────────────────────────────────────────
-            Button(
-                onClick  = onLogout,
-                modifier = Modifier.fillMaxWidth(),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                ),
-            ) {
-                Text("Logout")
+                    OutlinedTextField(
+                        value = uiState.vehicleType,
+                        onValueChange = onVehicleTypeChange,
+                        label = { Text("Vehicle Type") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isSaving,
+                        singleLine = true,
+                        placeholder = { Text("e.g., Bike, Car, Auto") },
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.vehicleNumber,
+                        onValueChange = onVehicleNumberChange,
+                        label = { Text("Vehicle Number") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isSaving,
+                        singleLine = true,
+                        placeholder = { Text("e.g., DL01AB1234") },
+                    )
+
+                    // ── Availability toggle ────────────────────────────────
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Available for Deliveries",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Switch(
+                            checked = uiState.isAvailable,
+                            onCheckedChange = onAvailabilityChange,
+                            enabled = !uiState.isSaving,
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ── Stats (read-only) ───────────────────────────────────
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "Statistics",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Total Deliveries",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = uiState.agent.totalDeliveries.toString(),
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "Total Earnings",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = "₹${uiState.agent.totalEarnings}",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ── Action buttons ──────────────────────────────────────
+                    Button(
+                        onClick = onSave,
+                        enabled = !uiState.isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (uiState.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .height(20.dp)
+                                    .padding(end = 8.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                        Text(if (uiState.isSaving) "Saving..." else "Save Changes")
+                    }
+
+                    OutlinedButton(
+                        onClick = onLogout,
+                        enabled = !uiState.isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Log Out")
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            is ProfileUiState.Error -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = "Error loading profile",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = uiState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(onClick = onRetry) {
+                        Text("Retry")
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ProfileField(label: String, value: String) {
-    Column(
+private fun ReadOnlyField(label: String, value: String) {
+    Surface(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small,
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
+        Column(
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ProfileScreenPreview() {
-    DeliveryAgentTheme { ProfileScreen() }
 }
