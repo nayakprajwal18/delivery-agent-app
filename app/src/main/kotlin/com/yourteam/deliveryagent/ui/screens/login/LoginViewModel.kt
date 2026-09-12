@@ -2,6 +2,8 @@ package com.yourteam.deliveryagent.ui.screens.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yourteam.deliveryagent.core.FCMTokenManager
+import com.yourteam.deliveryagent.data.repository.AgentRepository
 import com.yourteam.deliveryagent.data.repository.AuthRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +13,7 @@ import kotlinx.coroutines.launch
 
 class LoginViewModel(
     private val authRepository: AuthRepository,
+    private val agentRepository: AgentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -117,11 +120,13 @@ class LoginViewModel(
     /**
      * Step 3: After successful OTP verification, ensure the user has a delivery_agent profile.
      * If not, create one (both profiles and delivery_agents rows).
+     * Then retrieve and save the FCM token for push notifications.
      */
     private suspend fun ensureAgentProfile() {
         authRepository.ensureDeliveryAgentProfile().fold(
             onSuccess = {
-                _uiState.value = LoginUiState.VerificationSuccess
+                // Profile created/verified — now get and save FCM token
+                saveFcmToken()
             },
             onFailure = { error ->
                 _uiState.value = LoginUiState.Error(
@@ -130,6 +135,39 @@ class LoginViewModel(
                 )
             },
         )
+    }
+
+    /**
+     * Retrieves the FCM token and saves it to the delivery_agents row for the current user.
+     * This allows the backend to send targeted push notifications to this device.
+     *
+     * On error, we still transition to VerificationSuccess so the user isn't blocked,
+     * but log the failure for debugging.
+     */
+    private suspend fun saveFcmToken() {
+        val agentId = authRepository.currentUserId() ?: run {
+            // This shouldn't happen, but handle gracefully
+            _uiState.value = LoginUiState.VerificationSuccess
+            return
+        }
+
+        val token = FCMTokenManager.getToken()
+        if (token != null) {
+            agentRepository.saveFcmToken(agentId, token).fold(
+                onSuccess = {
+                    _uiState.value = LoginUiState.VerificationSuccess
+                },
+                onFailure = { error ->
+                    // Log the failure but still allow login to succeed
+                    android.util.Log.e("LoginViewModel", "Failed to save FCM token: ${error.message}")
+                    _uiState.value = LoginUiState.VerificationSuccess
+                },
+            )
+        } else {
+            // Token retrieval failed, but still allow login
+            android.util.Log.w("LoginViewModel", "FCM token is null, skipping save")
+            _uiState.value = LoginUiState.VerificationSuccess
+        }
     }
 
     /**

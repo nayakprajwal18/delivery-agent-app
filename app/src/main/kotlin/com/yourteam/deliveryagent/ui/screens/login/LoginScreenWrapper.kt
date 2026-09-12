@@ -29,7 +29,10 @@ fun LoginScreenWrapper(
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return LoginViewModel(container.authRepository) as T
+                return LoginViewModel(
+                    container.authRepository,
+                    container.agentRepository,
+                ) as T
             }
         }
     }

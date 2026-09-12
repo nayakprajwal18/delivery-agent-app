@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -36,10 +37,14 @@ import com.yourteam.deliveryagent.ui.screens.ProfileScreen
  * [startDestination] is determined in [MainActivity] by checking for an active session:
  *   - Active session → NavRoutes.HOME
  *   - No session     → NavRoutes.LOGIN
+ *
+ * [initialDeepLinkRoute] is passed from MainActivity if the app was opened from an FCM notification.
+ * If provided, it overrides the normal navigation after the start destination is reached.
  */
 @Composable
 fun AppNavGraph(
     startDestination: String = NavRoutes.LOGIN,
+    initialDeepLinkRoute: String? = null,
     navController: NavHostController = rememberNavController(),
 ) {
     // Routes on which the bottom nav bar should be visible.
@@ -53,6 +58,19 @@ fun AppNavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomNavRoutes
+
+    // Handle deeplink navigation after the NavHost is composed.
+    LaunchedEffect(initialDeepLinkRoute) {
+        if (initialDeepLinkRoute != null && startDestination != NavRoutes.LOGIN) {
+            // Only navigate if we're already logged in (startDestination is HOME).
+            // If we need to log in first, the deeplink will be lost, which is acceptable
+            // as we can re-open the notification tap after login.
+            navController.navigate(initialDeepLinkRoute) {
+                // Don't pop the start destination, so back button still works.
+                launchSingleTop = true
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
