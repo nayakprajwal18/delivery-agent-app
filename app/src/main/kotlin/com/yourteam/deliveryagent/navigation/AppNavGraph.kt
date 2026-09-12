@@ -99,7 +99,7 @@ fun AppNavGraph(
             }
 
             composable(NavRoutes.HISTORY) {
-                HistoryScreen()
+                com.yourteam.deliveryagent.ui.screens.history.HistoryScreenWrapper()
             }
 
             composable(NavRoutes.PROFILE) {
