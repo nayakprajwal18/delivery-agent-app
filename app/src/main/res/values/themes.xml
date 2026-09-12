@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This is the XML theme used before Compose takes over (splash + window background).
+  The actual Compose theme is defined in ui/theme/Theme.kt.
+-->
+<resources>
+    <style name="Theme.DeliveryAgent" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
