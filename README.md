@@ -265,3 +265,11 @@ MIT (for hackathon submission)
 
 **Built in 24 hours for the Hyperlocal Commerce Hackathon**  
 Contact: dev@deliveryagent.local
+
+
+---
+
+## ✅ Contribution Tracking Fixed
+- Updated git configuration with correct GitHub email for proper contribution tracking
+- All future commits will now appear on GitHub contribution graph
+- Last updated: September 12, 2026
