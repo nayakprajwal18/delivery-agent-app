@@ -120,8 +120,8 @@ fun AppNavGraph(
                 ),
             ) { backStackEntry ->
                 val orderId = backStackEntry.arguments?.getString(NavRoutes.ARG_ORDER_ID) ?: ""
-                DeliveryDetailsScreen(
-                    orderId    = orderId,
+                com.yourteam.deliveryagent.ui.screens.deliverydetails.DeliveryDetailsScreenWrapper(
+                    orderId = orderId,
                     onNavigateBack = { navController.popBackStack() },
                     onDeliveryCompleted = {
                         navController.navigate(NavRoutes.HOME) {
