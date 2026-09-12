@@ -1,0 +1,7 @@
+# Supabase Configuration
+# Get these from your Supabase project settings
+supabase.url=https://your-project-id.supabase.co
+supabase.key=your-anon-key
+
+# SDK Location (optional, if building from command line)
+# sdk.dir=/path/to/android/sdk
