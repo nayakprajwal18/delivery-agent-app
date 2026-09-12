@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import com.yourteam.deliveryagent.core.SupabaseClientProvider
+import com.yourteam.deliveryagent.data.repository.AgentRepository
 import com.yourteam.deliveryagent.data.repository.OrderRepository
 import com.yourteam.deliveryagent.ui.screens.DeliveryDetailsScreen
 
@@ -22,12 +22,14 @@ fun DeliveryDetailsScreenWrapper(
     // Instantiate ViewModel with DI
     val supabase = SupabaseClientProvider.client
     val orderRepository = OrderRepository(supabase)
+    val agentRepository = AgentRepository(supabase)
     
     val viewModel = remember {
         DeliveryDetailsViewModel(
             orderId = orderId,
             supabase = supabase,
             orderRepository = orderRepository,
+            agentRepository = agentRepository,
         )
     }
     

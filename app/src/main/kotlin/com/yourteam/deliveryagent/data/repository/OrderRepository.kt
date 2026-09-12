@@ -6,6 +6,8 @@ import com.yourteam.deliveryagent.data.model.OrderStatus
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 class OrderRepository(private val supabase: SupabaseClient) {
 
@@ -110,4 +112,54 @@ class OrderRepository(private val supabase: SupabaseClient) {
                     filter { eq("id", orderId) }
                 }
         }
+
+    /**
+     * Confirms delivery for [orderId]: updates status to DELIVERED and increments
+     * the delivery agent's total_deliveries and total_earnings.
+     *
+     * Returns the updated Order if successful.
+     *
+     * In production, this would be a single RPC call or trigger. For MVP, we do it
+     * in two steps: (1) update order status, (2) fetch and update agent stats.
+     */
+    suspend fun confirmDeliveryAndUpdateAgent(
+        orderId: String,
+        agentId: String,
+    ): Result<Order> = runCatching {
+        // Step 1: Fetch the current order to get delivery_fee
+        val order = fetchOrderById(orderId).getOrThrow()
+
+        // Step 2: Update order status to DELIVERED
+        updateOrderStatus(orderId, OrderStatus.DELIVERED).getOrThrow()
+
+        // Step 3: Increment agent's stats
+        supabase.postgrest["delivery_agents"]
+            .select(Columns.ALL) {
+                filter { eq("id", agentId) }
+            }
+            .decodeSingle<AgentStatsSnapshot>()
+            .let { agent ->
+                supabase.postgrest["delivery_agents"]
+                    .update(
+                        mapOf(
+                            "total_deliveries" to (agent.totalDeliveries + 1),
+                            "total_earnings"   to (agent.totalEarnings + order.deliveryFee),
+                        )
+                    ) {
+                        filter { eq("id", agentId) }
+                    }
+            }
+
+        // Step 4: Return the updated order
+        fetchOrderById(orderId).getOrThrow()
+    }
 }
+
+/** Minimal projection for agent stats updates. */
+@Serializable
+private data class AgentStatsSnapshot(
+    @SerialName("total_deliveries")
+    val totalDeliveries: Int,
+    @SerialName("total_earnings")
+    val totalEarnings: Double,
+)

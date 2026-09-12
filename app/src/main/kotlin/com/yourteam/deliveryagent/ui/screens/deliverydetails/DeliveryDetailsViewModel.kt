@@ -3,6 +3,7 @@ package com.yourteam.deliveryagent.ui.screens.deliverydetails
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourteam.deliveryagent.data.model.OrderStatus
+import com.yourteam.deliveryagent.data.repository.AgentRepository
 import com.yourteam.deliveryagent.data.repository.OrderRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.realtime.postgresChangeFlow
@@ -20,6 +21,7 @@ class DeliveryDetailsViewModel(
     private val orderId: String,
     private val supabase: SupabaseClient,
     private val orderRepository: OrderRepository,
+    private val agentRepository: AgentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DeliveryDetailsUiState>(DeliveryDetailsUiState.Loading)
@@ -117,21 +119,32 @@ class DeliveryDetailsViewModel(
     }
 
     /**
-     * Confirm delivery: update status to DELIVERED and sets delivered_at.
-     * Backend trigger should increment agent's total_earnings.
+     * Confirm delivery: update status to DELIVERED and increment agent's total_deliveries and total_earnings.
      * Called when agent taps "Confirm Delivery" button.
      */
     fun confirmDelivery() {
         val currentState = _uiState.value
         if (currentState !is DeliveryDetailsUiState.Success) return
 
+        val order = currentState.order
+        val agentId = order.agentId ?: run {
+            _uiState.value = currentState.copy(
+                confirmationError = "Agent ID not found"
+            )
+            return
+        }
+
         _uiState.value = currentState.copy(isConfirmingDelivery = true)
 
         viewModelScope.launch {
-            val result = orderRepository.updateOrderStatus(orderId, OrderStatus.DELIVERED)
+            val result = orderRepository.confirmDeliveryAndUpdateAgent(orderId, agentId)
             result.fold(
-                onSuccess = {
+                onSuccess = { updatedOrder ->
                     // Status update succeeded; navigate back to Home
+                    _uiState.value = currentState.copy(
+                        isConfirmingDelivery = false,
+                        order = updatedOrder,
+                    )
                     _uiEvents.emit(DeliveryDetailsUiEvent.NavigateToHome)
                 },
                 onFailure = { error ->
